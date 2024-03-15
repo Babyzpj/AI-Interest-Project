@@ -1,0 +1,9 @@
+langchain==0.1.9
+openai
+streamlit
+faiss-cpu
+tiktoken
+langchainhub
+pypdf
+pydantic==1.10.12
+boto3

@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+# ====================================
+# @Project ：LLMStreamlit
+# @IDE     ：PyCharm
+# @Author  ：Huang Andy Hong Hua
+# @Email   ：
+# @Date    ：2024/3/20 10:33
+# ====================================
+from langchain.document_loaders import PagedPDFSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
+import tiktoken
+import os
+
+# tokenizer
+tokenizer = tiktoken.get_encoding("cl100k_base")
+
+
+def length_function(text):
+    return len(tokenizer.encode(text))
+
+
+def embed_document(file_name, embedding_func, file_folder="pdf", embedding_folder="index"):
+    file_path = f"{file_folder}/{file_name}"
+    loader = PagedPDFSplitter(file_path)
+    source_pages = loader.load_and_split()
+
+    # embedding_func = OpenAIEmbeddings()  # openai embeddings 不使用
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=100,
+        length_function=length_function,  # len
+        is_separator_regex=False,
+        separators=["\n\n", "\n", " ", ""],
+    )
+    source_chunks = text_splitter.split_documents(source_pages)
+    search_index = FAISS.from_documents(source_chunks, embedding_func)
+    print('===== file_name:', file_name)
+    search_index.save_local(
+        folder_path=embedding_folder, index_name=file_name + ".index"
+    )
+
+
+def embed_all_pdf_docs(embedding_func):
+    # Define the directory path
+    pdf_directory = "pdf"
+
+    # Check if the directory exists
+    if os.path.exists(pdf_directory):
+        # List all PDF files in the directory
+        pdf_files = [
+            file for file in os.listdir(pdf_directory) if file.endswith(".pdf")
+        ]
+
+        if pdf_files:
+            for pdf_file in pdf_files:
+                print(f"Embedding {pdf_file}...")
+                embed_document(file_name=pdf_file, embedding_func=embedding_func, file_folder=pdf_directory)
+                print("Done!")
+        else:
+            raise Exception("No PDF files found in the directory.")
+    else:
+        raise Exception(f"Directory '{pdf_directory}' does not exist.")
+
+
+def get_all_index_files():
+    # Define the directory path
+    index_directory = "index"
+
+    # Check if the directory exists
+    if os.path.exists(index_directory):
+        # List all index files in the directory
+        postfix = ".index.faiss"
+        index_files = [
+            file.replace(postfix, "")
+            for file in os.listdir(index_directory)
+            if file.endswith(postfix)
+        ]
+
+        if index_files:
+            return index_files
+        else:
+            raise Exception("No index files found in the directory.")
+    else:
+        raise Exception(f"Directory '{index_directory}' does not exist.")
